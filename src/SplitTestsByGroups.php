@@ -1,6 +1,7 @@
 <?php
 namespace Codeception\Task;
 
+use Codeception\TestCase;
 use Robo\Task\Shared\TaskException;
 use Robo\Task\Shared\TaskInterface;
 use Symfony\Component\Finder\Finder;
@@ -15,6 +16,11 @@ trait SplitTestsByGroups {
     protected function taskSplitTestFilesByGroups($numGroups)
     {
         return new SplitTestFilesByGroupsTask($numGroups);
+    }
+
+    protected function taskSplitGroupsByGroups($numGroups)
+    {
+        return new SplitGroupsByGroupsTask($numGroups);
     }
     
 }
@@ -85,6 +91,90 @@ class SplitTestsByGroupsTask extends TestsSplitter implements TaskInterface
             $this->printTaskInfo("Writing $filename");
             file_put_contents($filename, implode("\n", $tests));
         }
+    }
+}
+
+/**
+ *
+ * Loads all tests of specific groups into groups and saves them to groupfile according to pattern.
+ *
+ * ``` php
+ * <?php
+ * $this->taskSplitGroupsByGroups(5)
+ *    ->groups($groupsToTest)
+ *    ->groupsTo('tests/_log/paratest_')
+ *    ->run();
+ * ?>
+ * ```
+ */
+class SplitGroupsByGroupsTask extends TestsSplitter implements TaskInterface
+{
+    protected $wantedGroups;
+
+    public function groups($groups) {
+        $this->wantedGroups = array_flip($groups);
+        return $this;
+    }
+
+    public function run() {
+        $availableGroups = $this->getTestsByGroups();
+        $processedGroups = array_intersect_key($availableGroups, $this->wantedGroups);
+
+        $this->printTaskInfo("Processing " . count($processedGroups) . " groups.");
+
+        $tests = call_user_func_array('array_merge', $processedGroups);
+
+        $i = 0;
+        $groups = [];
+
+        // splitting tests by groups
+        foreach ($tests as $test) {
+            $groups[($i % $this->numGroups) + 1][] = $tests[$i];
+            $i++;
+        }
+
+        // saving group files
+        foreach ($groups as $i => $tests) {
+            $filename = $this->saveTo . $i;
+            $this->printTaskInfo("Writing $filename");
+            file_put_contents($filename, implode("\n", $tests));
+        }
+    }
+
+    public function getGroupNames() {
+        return array_keys($this->getTestsByGroups());
+    }
+
+    /**
+     * Analyzes test annotations and groups the tests by their group annotation.
+     * @return 2-dimensional array where key is a group name and value an array of test full names
+     */
+    protected function getTestsByGroups() {
+        $testLoader = new \Codeception\TestLoader($this->testsFrom);
+        $testLoader->loadTests();
+        $tests = $testLoader->getTests();
+
+        $groupArray = [];
+        // Analyze each test case
+        foreach ($tests as $test) {
+            list($class, $method) = explode("::",TestCase::getTestSignature($test));
+
+            // Create reflection method to analyze doc comment
+            $annotation = new \ReflectionMethod($class, $method);
+            // Iterate over each line of doc comment
+            foreach(explode(PHP_EOL, $annotation) as $line) {
+                // Save test into groups mentioned in annotation
+                if (preg_match('@group\s(.*)$@', $line, $group)) {
+                    $group = $group[1];
+                    // Create key if group was not mentioned before
+                    if (!array_key_exists($group, $groupArray)) {
+                        $groupArray[$group] = array();
+                    }
+                    array_push($groupArray[$group], TestCase::getTestFullName($test));
+                }
+            }
+        }
+        return $groupArray;
     }
 }
 
