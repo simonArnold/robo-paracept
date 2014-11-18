@@ -118,10 +118,18 @@ class SplitGroupsByGroupsTask extends TestsSplitter implements TaskInterface
 
     public function run() {
         $availableGroups = $this->getTestsByGroups();
+
+        // Output all mistyped groups
+        $unknownGroups = array_diff(array_keys($this->wantedGroups), array_keys($availableGroups));
+        foreach ($unknownGroups as $x) $this->printTaskInfo("Unknown group: " . $x);
+
+        // Process known groups
         $processedGroups = array_intersect_key($availableGroups, $this->wantedGroups);
+        if (count($processedGroups) == 0) {
+            throw new \Exception("No valid groups provided");
+        }
 
         $this->printTaskInfo("Processing " . count($processedGroups) . " groups.");
-
         $tests = call_user_func_array('array_merge', $processedGroups);
 
         $i = 0;
