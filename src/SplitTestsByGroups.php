@@ -130,7 +130,7 @@ class SplitGroupsByGroupsTask extends TestsSplitter implements TaskInterface
         }
 
         $this->printTaskInfo("Processing " . count($processedGroups) . " groups.");
-        $tests = call_user_func_array('array_merge', $processedGroups);
+        $tests = array_unique(call_user_func_array('array_merge', $processedGroups));
 
         $i = 0;
         $groups = [];
