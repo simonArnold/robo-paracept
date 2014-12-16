@@ -137,7 +137,7 @@ class SplitGroupsByGroupsTask extends TestsSplitter implements TaskInterface
 
         // splitting tests by groups
         foreach ($tests as $test) {
-            $groups[($i % $this->numGroups) + 1][] = $tests[$i];
+            $groups[($i % $this->numGroups) + 1][] = $test;
             $i++;
         }
 
